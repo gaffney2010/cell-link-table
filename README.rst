@@ -1,6 +1,8 @@
 Introduction
 ============
 
+DISCLAIMER:  This is not an officially supported Google product.
+
 This library implements a table, where the cells are referenced by row and 
 column, and stored independently; with cells being dynamically loaded from 
 and saved to disk as needed.  Additionally, the table keeps track of 
