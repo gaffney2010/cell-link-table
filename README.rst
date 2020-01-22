@@ -234,13 +234,11 @@ calculate this with the Waterfall column:
 
 First we will need to make a column of ones, because Waterfall always 
 operates by adding another column.  For us, we will add 1 if the team is 
-present in prior rows.  To fill out a row, we can take advantage of 
-dictionary of dates/keys stored on the table, called cfb.ds.dates_keys. 
+present in prior rows.  To accomplish this, we use another row type,
+ConstColumn, which takes in the const we want to fill in.  This will continue
+to will in 1s as a we add new rows too.
 
->>> ones = FlatColumn("Ones", table=cfb)
->>> for date, keys in cfb.ds.dates_keys.items():
-...   for key in keys:  # Should only be one for us.
-...     cfb.set_cell_value(CellAddr(date, "Ones"), key, 1)
+>>> ones = ConstColumn("Ones", table=cfb, const=1)
 
 Now we build Waterfall columns for both Player1 and Player2.  For this column, we set:
 

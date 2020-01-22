@@ -170,6 +170,13 @@ class Column(object):
             The date that the cell is available.
         """
         return cell_addr.date
+        
+    def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
+        """Called when a new key is encountered.
+        
+        By default, does nothing.
+        """
+        pass
 
     def open(self) -> None:
         """Called when column is first obtained, to load relevant data.
@@ -220,3 +227,16 @@ class ProtectedColumn(Column):
 
     def available_on_date(self, cell_addr: CellAddr) -> int:
         return cell_addr.date + 1
+
+
+class ConstColumn(Column):
+    """A column where every value is equal to a constant, which is provided at
+    the time of initialization."""
+
+    def __init__(self, name: ColumnName, table: 'Table', const: Any):
+        self.const = const  # Must come first
+        super().__init__(name, table)
+        
+    def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
+        """When a new key is encountered, just store the column constant."""
+        self.table.set_cell_value(cell_addr, key, self.const)

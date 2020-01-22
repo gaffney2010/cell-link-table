@@ -80,9 +80,14 @@ class Table(object):
         """
         self.cm.add_column(column)
 
-        # Mark everything in this column for refresh for refresh
-        self.need_refresh[column.name] = {CellAddr(d, column.name) for d in
-                                          self.ds.dates}
+        for date, row_keys in self.ds.dates_keys.items():
+            # Mark everything in this column for refresh for refresh
+            self.need_refresh[column.name].add(CellAddr(date, column.name))
+            
+            # If the function has non-trivial init, then run for all existing
+            # rows.
+            for row_key in row_keys:
+                column.key_init(CellAddr(date, column.name), row_key)
 
     def get_cell_value(self, cell_addr: CellAddr, key: CellKey,
                        assert_available_on: int = MAX_DATE,
@@ -140,7 +145,15 @@ class Table(object):
             raise KeyError("Column not found.")
 
         # Add an entry for the date / key in ds if it doesn't exists.
-        self.ds.push_date(cell_addr.date, key)
+        new_key_encountered = self.ds.push_date(cell_addr.date, key)
+        
+        # push_date returns true if the key is previously unseen. 
+        if new_key_encountered:
+            for col, column in self.cm:
+                # Make initialization actions, if any.
+                column.key_init(cell_addr, key)
+                # And mark as needing updating.
+                self.need_refresh[col].add(CellAddr(cell_addr.date, col))
 
         # Write to the right place, potentially overwriting.
         self.cells.set_value(cell_addr, key, value)

@@ -67,6 +67,7 @@ dependencies are updated after that column.
 
 import os
 from collections import defaultdict
+from typing import Iterator, Tuple
 
 import dill
 
@@ -164,6 +165,12 @@ class ColumnManager(object):
         """Use accessor so that we can mark as save_needed."""
         self.save_needed.add(key)
         return self._columns[key]
+    
+    def items(self) -> Iterator[Tuple[ColumnName, Column]]:
+        """Forwards the .items() function from _columns."""
+        for k, v in self._columns.items():
+            self.save_needed.add(k)
+            yield k, v
 
     def add_column(self, column: Column) -> ColumnName:
         """Adds a column.
