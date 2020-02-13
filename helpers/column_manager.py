@@ -165,7 +165,7 @@ class ColumnManager(object):
         """Use accessor so that we can mark as save_needed."""
         self.save_needed.add(key)
         return self._columns[key]
-    
+
     def items(self) -> Iterator[Tuple[ColumnName, Column]]:
         """Forwards the .items() function from _columns."""
         for k, v in self._columns.items():
@@ -223,7 +223,7 @@ class ColumnManager(object):
         with open(path, "wb") as f:
             dill.dump(object, f)
 
-    def open(self) -> None:
+    def open(self, table: 'Table') -> None:
         """Load up any existing columns.
 
         Looks through the column files to see if any match the prefix, and loads
@@ -236,7 +236,7 @@ class ColumnManager(object):
                     continue
                 new_col = self.add_column(
                     self._load_file(os.path.join(root, file)))
-                self._columns[new_col].open()
+                self._columns[new_col].open(table)
         self._update_column_dependencies()
 
     def close(self) -> None:

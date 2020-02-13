@@ -151,10 +151,10 @@ class WaterfallMap(object):
     Would yield a Snapshot that looks like:
     {"Checking": 30, "Savings": 10, "Other": 15}
 
-    Waterfall allows for multiple key/values pairs.  For example, if you had 
-    a record of 2-player games, and you wanted to save points, by player, 
-    you could pass input_maps=[WaterfallMap("Player1", "Points1"), 
-    WaterfallMap("Player2", "Points2")] in the following example: 
+    Waterfall allows for multiple key/values pairs.  For example, if you had
+    a record of 2-player games, and you wanted to save points, by player,
+    you could pass input_maps=[WaterfallMap("Player1", "Points1"),
+    WaterfallMap("Player2", "Points2")] in the following example:
 
     +---------+---------+---------+---------+
     | Player1 | Player2 | Points1 | Points2 |
@@ -287,11 +287,6 @@ class Waterfall(Column):
         self.output_key = output_key
         self.tail_length = tail_length_years * 10000
 
-        self.snapshot_master = SnapshotMaster(
-            "SNAPSHOT_{}:{}".format(table.prefix, name))
-        self.snapshot_dates = DateSet(
-            "SNAPSHOT_{}:{}".format(table.prefix, name))
-
         # Should set the name and the table.
         super().__init__(name, table)
 
@@ -343,20 +338,18 @@ class Waterfall(Column):
         Returns:
             Snapshot representing this single date in the table.
         """
-        # We don't actually use this until the next day.
-        will_use_on = date + 1
-
         result = defaultdict(int)
+        # Get all rows for date
         for key in self.table.all_keys_for_address(CellAddr(date, self.name)):
+            # All the input maps
             for in_map in self.input_maps:
-                this_key = self.table.get_cell_value(
+                key_in_result = self.table.get_cell_value(
                     CellAddr(date, in_map.key_column), key)
-                if this_key is None:
+                if key_in_result is None:
                     continue
-                result[this_key] += default_or(
+                result[key_in_result] += default_or(
                     self.table.get_cell_value(
-                        CellAddr(date, in_map.value_column), key,
-                        assert_available_on=will_use_on))
+                        CellAddr(date, in_map.value_column), key))
         return result
 
     def _save_snapshot(self, date: Date, snapshot: Snapshot):
@@ -458,8 +451,15 @@ class Waterfall(Column):
             for k, v in self._get_snapshot_increment(next_cell_date).items():
                 working_snapshot[k] += v
 
-    def open(self) -> None:
+    def open(self, table: Table) -> None:
         """Load up the snapshot data, from disk."""
+        super().open(table)
+
+        self.snapshot_master = SnapshotMaster(
+            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name))
+        self.snapshot_dates = DateSet(
+            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name))
+
         self.snapshot_master.open()
         self.snapshot_dates.open()
 

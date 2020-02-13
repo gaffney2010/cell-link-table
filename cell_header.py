@@ -23,9 +23,11 @@ from typing import Any, DefaultDict, List, Set, Text
 import attr
 import numpy as np
 
-CELL_FILES_DIR = "data/cell_files"
-COLUMN_FILES_DIR = "data/column_data"
-DATE_SET_DIR = "data/dateset_data"
+ABSOLUTE_DIR = "/home/gaffney/psdata"
+
+CELL_FILES_DIR = ABSOLUTE_DIR + "/cell_files"
+COLUMN_FILES_DIR = ABSOLUTE_DIR + "/column_data"
+DATE_SET_DIR = ABSOLUTE_DIR + "/dateset_data"
 DATES_FILE = "dates_file"
 DATES_SET_FILE = "dates_set_file"
 BACKUP = "backup"
@@ -107,9 +109,10 @@ class Column(object):
     """
 
     def __init__(self, name: ColumnName, table: 'Table'):
-        self.table = table
         self.name = name
         self._column_dependencies = set()
+
+        self.open(table)
 
         # Add this column to the table.
         table.add_column(self)
@@ -170,15 +173,15 @@ class Column(object):
             The date that the cell is available.
         """
         return cell_addr.date
-        
+
     def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
         """Called when a new key is encountered.
-        
+
         By default, does nothing.
         """
         pass
 
-    def open(self) -> None:
+    def open(self, table: 'Table') -> None:
         """Called when column is first obtained, to load relevant data.
 
         For the base column, this will do nothing because the column is
@@ -186,13 +189,13 @@ class Column(object):
         component, specifically any helpers on the column (ColumnManager,
         DateSet, PageMaster).
         """
-        pass
+        self.table = table
 
     def close(self) -> None:
         """Called when done with the column, to ensure proper saving.
 
-        For the base column, we only set the table to None.  This is so that 
-        we don't try to save a copy of the table when we save the column; 
+        For the base column, we only set the table to None.  This is so that
+        we don't try to save a copy of the table when we save the column;
         saving columns will always follow closing.
 
         Generally we want to use this to save any non-trivial
@@ -236,7 +239,7 @@ class ConstColumn(Column):
     def __init__(self, name: ColumnName, table: 'Table', const: Any):
         self.const = const  # Must come first
         super().__init__(name, table)
-        
+
     def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
         """When a new key is encountered, just store the column constant."""
         self.table.set_cell_value(cell_addr, key, self.const)

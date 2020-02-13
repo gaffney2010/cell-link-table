@@ -83,7 +83,7 @@ class Table(object):
         for date, row_keys in self.ds.dates_keys.items():
             # Mark everything in this column for refresh for refresh
             self.need_refresh[column.name].add(CellAddr(date, column.name))
-            
+
             # If the function has non-trivial init, then run for all existing
             # rows.
             for row_key in row_keys:
@@ -146,8 +146,8 @@ class Table(object):
 
         # Add an entry for the date / key in ds if it doesn't exists.
         new_key_encountered = self.ds.push_date(cell_addr.date, key)
-        
-        # push_date returns true if the key is previously unseen. 
+
+        # push_date returns true if the key is previously unseen.
         if new_key_encountered:
             for col, column in self.cm:
                 # Make initialization actions, if any.
@@ -218,7 +218,7 @@ class Table(object):
         """Open each of the core components."""
         self.cells.open()
         self.ds.open()
-        self.cm.open()
+        self.cm.open(self)
 
     def close(self) -> None:
         """Close each of the core components."""
