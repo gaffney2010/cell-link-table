@@ -110,6 +110,9 @@ class SimpleFormula(Column):
             table: The table that this column lives in, will use to update
                 values and to mark dependents.
         """
+        if self.readonly:
+            return
+        
         for cell_addr in self.table.need_refresh[self.name]:
             for key in self.table.all_keys_for_address(cell_addr):
                 new_value = _calculate_f(self.table, self.f,
@@ -378,6 +381,9 @@ class Waterfall(Column):
                 which cells need refreshing.  Should match the table used to
                 save snapshots.
         """
+        if self.readonly:
+            return
+        
         if len(self.table.need_refresh[self.name]) == 0:
             return
 
@@ -451,20 +457,23 @@ class Waterfall(Column):
             for k, v in self._get_snapshot_increment(next_cell_date).items():
                 working_snapshot[k] += v
 
-    def open(self, table: Table) -> None:
+    def open(self, table: Table, readonly: bool = False) -> None:
         """Load up the snapshot data, from disk."""
-        super().open(table)
+        super().open(table, readonly=readonly)
 
         self.snapshot_master = SnapshotMaster(
-            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name))
+            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name), readonly)
         self.snapshot_dates = DateSet(
-            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name))
+            "SNAPSHOT_{}:{}".format(self.table.prefix, self.name), readonly)
 
         self.snapshot_master.open()
         self.snapshot_dates.open()
 
     def close(self) -> None:
         """Save off the snapshot data. from disk."""
+        if self.readonly:
+            return
+        
         self.snapshot_master.close()
         self.snapshot_dates.close()
 

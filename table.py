@@ -48,6 +48,8 @@ class Table(object):
         prefix: How we identify the Table.  This is attached to the file names,
             and used to link to the components (CellMaster, ColumnManager, and
             Dateset).
+        readonly: If raised, may only read from the table.  Saves time on
+            closing.
         cells: A CellMaster which is used to save and load cells.
         cm: A ColumnManager used to save and load columns, and maintain an
             update order.
@@ -57,12 +59,13 @@ class Table(object):
             (for that column) that need refreshing.
     """
 
-    def __init__(self, prefix: Text) -> None:
+    def __init__(self, prefix: Text, readonly: bool = False) -> None:
         self.prefix = prefix
+        self.readonly = readonly
 
-        self.cells = CellMaster(self.prefix)
-        self.cm = ColumnManager(self.prefix)
-        self.ds = DateSet(self.prefix)
+        self.cells = CellMaster(self.prefix, readonly=readonly)
+        self.cm = ColumnManager(self.prefix, readonly=readonly)
+        self.ds = DateSet(self.prefix, readonly=readonly)
 
         self.need_refresh: DefaultDict[ColumnName, Set[CellAddr]] = defaultdict(
             set)
@@ -78,6 +81,9 @@ class Table(object):
             column: The columns we want to add.
             delay_update: If false, will update column manager immediately.
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+        
         self.cm.add_column(column)
 
         for date, row_keys in self.ds.dates_keys.items():
@@ -140,6 +146,9 @@ class Table(object):
             key: The key for which to assign the value.
             value: The value to assign.
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+
         # Throw an error if the column hasn't been loaded
         if cell_addr.col not in self.cm:
             raise KeyError("Column not found.")
@@ -185,6 +194,9 @@ class Table(object):
         sending the columns a copy of this table; the columns will refer back
         to the table to see which addresses need refreshing.
         """
+        if self.readonly:
+            return
+            
         for column_name in self.cm.refresh_order:
             if self.need_refresh[column_name]:
                 self.cm.get_column(column_name).refresh()
@@ -222,6 +234,9 @@ class Table(object):
 
     def close(self) -> None:
         """Close each of the core components."""
+        if self.readonly:
+            return
+        
         # If anything need to be refreshed then refresh.
         for _, v in self.need_refresh.items():
             if v:

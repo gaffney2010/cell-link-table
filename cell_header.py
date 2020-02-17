@@ -104,12 +104,15 @@ class Column(object):
     Attributes:
         table: A pointer to the table that this column is associated with.
         name: Columns are very often identified by their name only.
+        readonly: If raised, may only read from the table.  Saves time on
+            closing.
         _column_dependencies: A set of names of columns that depend on this
             column.
     """
 
     def __init__(self, name: ColumnName, table: 'Table'):
         self.name = name
+        self.readonly = False  # Would need to be overwritten with open
         self._column_dependencies = set()
 
         self.open(table)
@@ -181,7 +184,7 @@ class Column(object):
         """
         pass
 
-    def open(self, table: 'Table') -> None:
+    def open(self, table: 'Table', readonly: bool = False) -> None:
         """Called when column is first obtained, to load relevant data.
 
         For the base column, this will do nothing because the column is
@@ -190,6 +193,7 @@ class Column(object):
         DateSet, PageMaster).
         """
         self.table = table
+        self.readonly = readonly
 
     def close(self) -> None:
         """Called when done with the column, to ensure proper saving.

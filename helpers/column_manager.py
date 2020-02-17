@@ -132,6 +132,8 @@ class ColumnManager(object):
     Attributes:
         prefix: How we identify the ColumnManager.  Matches to the prefix on the
             table.  This is attached to the file names.
+        readonly: If raised, may only read from the table.  Saves time on
+            closing.
         _columns: A dict whose values are the columns covered by the manager,
             keyed by the name of those columns.  Should be accessed through
             get_column.
@@ -146,8 +148,9 @@ class ColumnManager(object):
             externally.
     """
 
-    def __init__(self, prefix: Text):
+    def __init__(self, prefix: Text, readonly: bool = False):
         self.prefix = prefix
+        self.readonly = readonly
 
         self._columns: Dict[ColumnName, Column] = dict()
 
@@ -163,7 +166,8 @@ class ColumnManager(object):
     # TODO: Lazy load.
     def get_column(self, key: ColumnName) -> Column:
         """Use accessor so that we can mark as save_needed."""
-        self.save_needed.add(key)
+        if not self.readonly:
+            self.save_needed.add(key)
         return self._columns[key]
 
     def items(self) -> Iterator[Tuple[ColumnName, Column]]:
@@ -184,6 +188,9 @@ class ColumnManager(object):
         Returns:
             The new columns name.
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         if column.name in self._columns:
             # Already added.  Do nothing.  Trust user to not create multiple
             # different columns with the same name.
@@ -198,6 +205,9 @@ class ColumnManager(object):
 
     def _update_column_dependencies(self) -> None:
         """Calculate the refresh order by given the dependency graph."""
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         for k, v in self._columns.items():
             # Need to reset all columns because the dependencies may have
             # changed.
@@ -220,6 +230,9 @@ class ColumnManager(object):
 
     def _save_file(self, object: Column, path: Text) -> None:
         """Save the passed dict to the passed path."""
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         with open(path, "wb") as f:
             dill.dump(object, f)
 
@@ -236,7 +249,7 @@ class ColumnManager(object):
                     continue
                 new_col = self.add_column(
                     self._load_file(os.path.join(root, file)))
-                self._columns[new_col].open(table)
+                self._columns[new_col].open(table, readonly=self.readonly)
         self._update_column_dependencies()
 
     def close(self) -> None:
@@ -245,6 +258,8 @@ class ColumnManager(object):
         Calls close() on the columns, which will save and clear supplemental
         data, then saves to the column files with the prefix.
         """
+        if self.readonly:
+            return
         if not self.save_needed:
             return
 

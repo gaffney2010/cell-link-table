@@ -86,14 +86,17 @@ class DateSet(object):
 
     Attributes:
         prefix: Text that tells us how to save / load files.
+        readonly: If raised, may only read from the table.  Saves time on
+            closing.
         dates_keys: A dict where the keys are distinct dates, and the values are
             set of the CellKeys for that date.
         dates: An ordered list with all the Dates we've added.  We maintain
             the order as we add new dates
     """
 
-    def __init__(self, prefix: Text):
+    def __init__(self, prefix: Text, readonly: bool = False):
         self.prefix = prefix
+        self.readonly = readonly
 
         self.dates_keys: DefaultDict[Date, Set[CellKey]] = defaultdict(set)
         self.dates: List[Date] = list()
@@ -162,6 +165,9 @@ class DateSet(object):
         Arguments:
             date: The date that we want to add to our date set.
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         date_already_encountered = (date in self.dates_keys)
         self.dates_keys[date].add(cell_key)
         if date_already_encountered:
@@ -188,6 +194,9 @@ class DateSet(object):
 
     def _save_file(self, object: Any, path: Text) -> None:
         """Pass through to pickle.dump"""
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         with open(path, "wb") as f:
             pickle.dump(object, f)
 
@@ -212,6 +221,9 @@ class DateSet(object):
         Saves both a primary and a backup for both the dates list and for
         the dates_keys.  Uses the stored prefix to decide the files' paths.
         """
+        if self.readonly:
+            return
+            
         dates_path = os.path.join(
             DATE_SET_DIR, "{}_{}".format(self.prefix, DATES_FILE))
         dates_set_path = os.path.join(

@@ -98,12 +98,15 @@ class PageMaster(Generic[Addr]):
     Attributes:
         prefix: How we identify the PageMaster.  Matches to the prefix on the
             table.  This is attached to the file names.
+        readonly: If raised, may only read from the table.  Saves time on
+            closing.
         cache: This stores the most-recently used pages locally.
         casche_size: The number of pages that we want to keep in the cache.
     """
 
-    def __init__(self, prefix: Text, cache_size: int = 80):
+    def __init__(self, prefix: Text, cache_size: int = 80, readonly: bool = False):
         self.prefix = prefix
+        self.readonly = readonly
         self.cache = list()
         self.cache_size = cache_size
 
@@ -137,6 +140,9 @@ class PageMaster(Generic[Addr]):
             key: The key for which to assign the value.
             value: The value to assign
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         page = self._get_page(addr)
         page[self._addr_key(addr, key)] = value
 
@@ -238,6 +244,9 @@ class PageMaster(Generic[Addr]):
 
     def _save_file(self, object: Dict, path: Text) -> None:
         """Save the passed dict to the passed path."""
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         with open(path, "wb") as f:
             pickle.dump(object, f)
 
@@ -251,6 +260,9 @@ class PageMaster(Generic[Addr]):
             cache_index: If set, save the page in that spot of the index; this
                 is used when saving all pages.
         """
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         if cache_index is None:
             # If not specified, save the last one.  The most common case.
             cache_index = len(self.cache) - 1
@@ -263,6 +275,9 @@ class PageMaster(Generic[Addr]):
 
     def save_all_and_empty(self) -> None:
         """Save all open pages, and clear the cache."""
+        if self.readonly:
+            raise PermissionError("Cannot modify a readonly.")
+            
         for i in range(len(self.cache)):
             self._save_single_page(i)
         self.cache = []
@@ -273,6 +288,9 @@ class PageMaster(Generic[Addr]):
 
     def close(self):
         """Upon closing, just save all the pages."""
+        if self.readonly:
+            return
+        
         self.save_all_and_empty()
 
 
@@ -282,8 +300,8 @@ class CellMaster(PageMaster[CellAddr]):
     This is used to load and save the main data in the cell link table.
     """
 
-    def __init__(self, prefix: Text, cache_size=80):
-        super().__init__(prefix, cache_size=cache_size)
+    def __init__(self, prefix: Text, cache_size=80, readonly: bool = False):
+        super().__init__(prefix, cache_size=cache_size, readonly=readonly)
 
     def _addr_to_page(self, cell_addr: CellAddr) -> Text:
         """Set the address so that cells in the same month, same column will be
@@ -299,10 +317,10 @@ class SnapshotMaster(PageMaster[Date]):
     and set to only require the one argument.
     """
 
-    def __init__(self, column_name: ColumnName):
+    def __init__(self, column_name: ColumnName, readonly: bool = False):
         # Use a smaller cache, because Snapshots are so big!
         super().__init__("SNAPSHOT-{}".format(column_name),
-                         cache_size=5)
+                         cache_size=5, readonly=readonly)
 
     def _addr_to_page(self, addr: Date) -> Text:
         """Set the address to the start_date."""
