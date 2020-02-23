@@ -83,7 +83,7 @@ class Table(object):
         """
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-        
+
         self.cm.add_column(column)
 
         for date, row_keys in self.ds.dates_keys.items():
@@ -122,7 +122,7 @@ class Table(object):
             raise KeyError("Not available on date.")
 
         result = self.cells.get_value(cell_addr, key)
-        
+
         # Initialize a value then.
         if result is None:
             result = self.cm.get_column(cell_addr.col).key_init(cell_addr, key)
@@ -200,7 +200,7 @@ class Table(object):
         """
         if self.readonly:
             return
-            
+
         for column_name in self.cm.refresh_order:
             if self.need_refresh[column_name]:
                 self.cm.get_column(column_name).refresh()
@@ -240,7 +240,7 @@ class Table(object):
         """Close each of the core components."""
         if self.readonly:
             return
-        
+
         # If anything need to be refreshed then refresh.
         for _, v in self.need_refresh.items():
             if v:

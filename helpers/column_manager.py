@@ -160,7 +160,7 @@ class ColumnManager(object):
 
     def __contains__(self, col: ColumnName) -> bool:
         """True if col is in self._columns"""
-        return col in self._column_paths
+        return col in self._column_paths or col in self._columns
 
     def get_column(self, key: ColumnName) -> Column:
         """Lazy load the columns as needed."""
@@ -202,9 +202,6 @@ class ColumnManager(object):
 
     def _update_column_dependencies(self) -> None:
         """Calculate the refresh order by given the dependency graph."""
-        if self.readonly:
-            raise PermissionError("Cannot modify a readonly.")
-
         for k, v in self._columns.items():
             # accessed to reset all columns because the dependencies may have
             # changed.
@@ -251,6 +248,7 @@ class ColumnManager(object):
                     continue
                 self._column_paths[file.split("-")[1]] = os.path.join(root,
                                                                       file)
+
         self._update_column_dependencies()
 
     def close(self) -> None:
