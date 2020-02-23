@@ -112,7 +112,7 @@ class SimpleFormula(Column):
         """
         if self.readonly:
             return
-        
+
         for cell_addr in self.table.need_refresh[self.name]:
             for key in self.table.all_keys_for_address(cell_addr):
                 new_value = _calculate_f(self.table, self.f,
@@ -383,9 +383,6 @@ class Waterfall(Column):
         """
         if self.readonly:
             return
-        
-        if len(self.table.need_refresh[self.name]) == 0:
-            return
 
         # Look for the most recent snapshot, and start working with that.
         min_date = min(ca.date for ca in self.table.need_refresh[self.name])
@@ -473,7 +470,7 @@ class Waterfall(Column):
         """Save off the snapshot data. from disk."""
         if self.readonly:
             return
-        
+
         self.snapshot_master.close()
         self.snapshot_dates.close()
 

@@ -70,7 +70,6 @@ from collections import defaultdict
 from typing import Iterator, Tuple
 
 import dill
-
 from cell_header import *
 from helpers.topological_sort import *
 
@@ -135,13 +134,13 @@ class ColumnManager(object):
         readonly: If raised, may only read from the table.  Saves time on
             closing.
         _columns: A dict whose values are the columns covered by the manager,
-            keyed by the name of those columns.  Should be accessed through
+            keyed by the name of those columns.  Keys only exist for columns that
+            have been accessed at least once.  Should be accessed through
             get_column.
+        _column_paths: File paths where we've saved the columns as dills.
         dependency_graph: A dict whose keys are column names, and the values are
             sets containing the names of the columns which depend on the column
             named in the key.
-        save_needed: A set of columns which have been altered since the last
-            save.
         refresh_order: A list of column names specifying the order that the
             columns should be updated so that any column"s dependencies are
             updated after that column.  Intended to be directly accessed
@@ -153,34 +152,33 @@ class ColumnManager(object):
         self.readonly = readonly
 
         self._columns: Dict[ColumnName, Column] = dict()
+        self._column_paths: Dict[ColumnName, Text] = dict()
 
         self.dependency_graph: DefaultDict[ColumnName, Set[ColumnName]] = \
             defaultdict(set)
-        self.save_needed: Set[bool] = set()
         self.refresh_order: List[ColumnName] = list()
 
     def __contains__(self, col: ColumnName) -> bool:
         """True if col is in self._columns"""
-        return col in self._columns
+        return col in self._column_paths
 
-    # TODO: Lazy load.
     def get_column(self, key: ColumnName) -> Column:
-        """Use accessor so that we can mark as save_needed."""
-        if not self.readonly:
-            self.save_needed.add(key)
+        """Lazy load the columns as needed."""
+        if key not in self._columns:
+            self.add_column(self._load_file(key))
+            self._columns[key].open(table, readonly=self.readonly)
+
         return self._columns[key]
 
     def items(self) -> Iterator[Tuple[ColumnName, Column]]:
         """Forwards the .items() function from _columns."""
         for k, v in self._columns.items():
-            self.save_needed.add(k)
             yield k, v
 
     def add_column(self, column: Column) -> ColumnName:
         """Adds a column.
 
         Keep a reference to the column, indexed by the name of the column.
-        Additionally marks the column as needing to be saved.
 
         Arguments:
             column: The column that we want to add.
@@ -190,7 +188,7 @@ class ColumnManager(object):
         """
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         if column.name in self._columns:
             # Already added.  Do nothing.  Trust user to not create multiple
             # different columns with the same name.
@@ -200,16 +198,15 @@ class ColumnManager(object):
         # Calculate the refresh order by given the dependency graph.
         self._update_column_dependencies()
 
-        self.save_needed.add(column.name)
         return column.name
 
     def _update_column_dependencies(self) -> None:
         """Calculate the refresh order by given the dependency graph."""
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         for k, v in self._columns.items():
-            # Need to reset all columns because the dependencies may have
+            # accessed to reset all columns because the dependencies may have
             # changed.
             self.dependency_graph[k] = v.dependencies()
         self.refresh_order = topological(self.dependency_graph)
@@ -219,9 +216,11 @@ class ColumnManager(object):
         for root, _, files in os.walk(os.path.join("..", COLUMN_FILES_DIR)):
             yield (root, files)
 
-    def _load_file(self, path: Text) -> Column:
+    def _load_file(self, key: Text) -> Column:
         """Load the dict from the passed path.  Return an empty dict if path
         doesn"t exist."""
+        path = self._column_paths[key]
+
         result = dict()
         if os.path.exists(path):
             with open(path, "rb") as f:
@@ -232,7 +231,7 @@ class ColumnManager(object):
         """Save the passed dict to the passed path."""
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         with open(path, "wb") as f:
             dill.dump(object, f)
 
@@ -241,15 +240,17 @@ class ColumnManager(object):
 
         Looks through the column files to see if any match the prefix, and loads
         them.  Then calls open on those columns to do any supplemental loading
-        if needed.
+        if accesseded.
         """
+        # Hold a pointer to the table.
+        self.table = table
+
         for root, files in self._walk_files():
             for file in files:
                 if file.find(self.prefix) == -1:
                     continue
-                new_col = self.add_column(
-                    self._load_file(os.path.join(root, file)))
-                self._columns[new_col].open(table, readonly=self.readonly)
+                self._column_paths[file.split("-")[1]] = os.path.join(root,
+                                                                      file)
         self._update_column_dependencies()
 
     def close(self) -> None:
@@ -260,19 +261,20 @@ class ColumnManager(object):
         """
         if self.readonly:
             return
-        if not self.save_needed:
-            return
 
         # Close then save all the columns, overwriting.  Closing will clear
         # non-trivial data structures.
         for k, v in self._columns.items():
-            if k not in self.save_needed:
-                continue
             v.close()
             write_path = os.path.join(
                 COLUMN_FILES_DIR, "{}-{}".format(self.prefix, k))
             self._save_file(v, write_path)
 
         # Clear
-        self.save_needed = set()
-        self._columns = dict()
+        self.table = None
+        self.prefix = None
+        self.readonly = None
+        self._columns= None
+        self._column_paths= None
+        self.dependency_graph = None
+        self.refresh_order = None

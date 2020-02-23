@@ -90,15 +90,10 @@ class Table(object):
             # Mark everything in this column for refresh for refresh
             self.need_refresh[column.name].add(CellAddr(date, column.name))
 
-            # If the function has non-trivial init, then run for all existing
-            # rows.
-            for row_key in row_keys:
-                column.key_init(CellAddr(date, column.name), row_key)
-
     def get_cell_value(self, cell_addr: CellAddr, key: CellKey,
                        assert_available_on: int = MAX_DATE,
                        check_date_availability: bool = CHECK_DATE_AVAILABILITY) -> \
-    Optional[Any]:
+    Any:
         """Get value corresponding to the key at the cell address.
 
         Mostly a straight-forward pass-through to the get_value function on
@@ -120,14 +115,23 @@ class Table(object):
                 for testing.
 
         Returns:
-            The value at the cell_addr / key.  Or None, if not found.
+            The value at the cell_addr / key.  Or NoneClass instance, if not found.
         """
         if check_date_availability and assert_available_on < self.cm.get_column(
                 cell_addr.col).available_on_date(cell_addr):
             raise KeyError("Not available on date.")
 
-        # Will return none if key is not found at cell_addr.
-        return self.cells.get_value(cell_addr, key)
+        result = self.cells.get_value(cell_addr, key)
+        
+        # Initialize a value then.
+        if result is None:
+            result = self.cm.get_column(cell_addr.col).key_init(cell_addr, key)
+            # To prevent key_init() from running again.
+            if result is None:
+                result = NoneClass()
+            self.cells.set_value(cell_addr, key, result)
+
+        return result
 
     def set_cell_value(self, cell_addr: CellAddr, key: CellKey,
                        value: Any) -> None:

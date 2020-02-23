@@ -44,8 +44,16 @@ ColumnName = Text
 Snapshot = DefaultDict[CellKey, int]
 
 
+class NoneClass(object):
+    """This represents a None that was intentionally set."""
+    pass
+
+
 def nonish(x):
     """Encapsulates the many ways that a cell can be missing a value."""
+    if isinstance(x, NoneClass):
+        return True
+    
     if x is None:
         return True
     try:
