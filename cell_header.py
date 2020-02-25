@@ -53,7 +53,7 @@ def nonish(x):
     """Encapsulates the many ways that a cell can be missing a value."""
     if isinstance(x, NoneClass):
         return True
-    
+
     if x is None:
         return True
     try:
@@ -185,12 +185,18 @@ class Column(object):
         """
         return cell_addr.date
 
-    def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
+    def key_init(self, cell_addr: CellAddr, key: CellKey,
+                 readonly: bool = False) -> Any:
         """Called when a new key is encountered.
 
-        By default, does nothing.
+        Should set a value to the cell (if not readonly), and return that value.
+        WARNING on override: If you don't set a value, this will cause repeated
+        work.
+
+        By default, set None.
         """
-        pass
+        if not readonly:
+            self.table.set_cell_value(cell_addr, key, None)
 
     def open(self, table: 'Table', readonly: bool = False) -> None:
         """Called when column is first obtained, to load relevant data.
@@ -252,6 +258,9 @@ class ConstColumn(Column):
         self.const = const  # Must come first
         super().__init__(name, table)
 
-    def key_init(self, cell_addr: CellAddr, key: CellKey) -> None:
+    def key_init(self, cell_addr: CellAddr, key: CellKey,
+                 readonly: bool = False) -> Any:
         """When a new key is encountered, just store the column constant."""
-        self.table.set_cell_value(cell_addr, key, self.const)
+        if not readonly:
+            self.table.set_cell_value(cell_addr, key, self.const)
+        return self.const

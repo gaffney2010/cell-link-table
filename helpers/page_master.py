@@ -120,15 +120,11 @@ class PageMaster(Generic[Addr]):
             key: The key for which to return the value.
 
         Returns:
-            The value assigned to the key.  Or None, if no value exists, or
+            The value assigned to the key.  Or NoneClass, if no value exists, or
                 there was an error.
         """
-        try:
-            page = self._get_page(addr)
-            result = page.get(self._addr_key(addr, key), None)
-        except:
-            result = None
-        return result
+        page = self._get_page(addr)
+        return page.get(self._addr_key(addr, key), NoneClass())
 
     def set_value(self, addr: Addr, key: Text, value: Any) -> None:
         """Sets the passed value to the key at the address.
@@ -142,7 +138,7 @@ class PageMaster(Generic[Addr]):
         """
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         page = self._get_page(addr)
         page[self._addr_key(addr, key)] = value
 
@@ -164,7 +160,7 @@ class PageMaster(Generic[Addr]):
 
     def _addr_to_page(self, addr: Addr) -> Text:
         """Maps the address to a page name.
-        
+
         The page name is used throughout to know where to look for a key stored
         to a addr.
 
@@ -207,7 +203,7 @@ class PageMaster(Generic[Addr]):
 
     def _load_new_page(self, page_name: Text) -> Dict:
         """Load the dict (page) from the file name.
-        
+
         Load from the file name, and insert the page at the beginning of the
         cache, pushing the least-recently used page out of the cache (if
         cache size exceeded).  Then returns that page.
@@ -228,7 +224,8 @@ class PageMaster(Generic[Addr]):
 
         # If the cache is full then save the last cache, then forget it
         if len(self.cache) > self.cache_size:
-            self._save_single_page()
+            if not self.readonly:
+                self._save_single_page()
             self.cache = self.cache[:self.cache_size]
 
         return new_dict
@@ -246,7 +243,7 @@ class PageMaster(Generic[Addr]):
         """Save the passed dict to the passed path."""
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         with open(path, "wb") as f:
             pickle.dump(object, f)
 
@@ -262,7 +259,7 @@ class PageMaster(Generic[Addr]):
         """
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         if cache_index is None:
             # If not specified, save the last one.  The most common case.
             cache_index = len(self.cache) - 1
@@ -277,7 +274,7 @@ class PageMaster(Generic[Addr]):
         """Save all open pages, and clear the cache."""
         if self.readonly:
             raise PermissionError("Cannot modify a readonly.")
-            
+
         for i in range(len(self.cache)):
             self._save_single_page(i)
         self.cache = []
@@ -290,7 +287,7 @@ class PageMaster(Generic[Addr]):
         """Upon closing, just save all the pages."""
         if self.readonly:
             return
-        
+
         self.save_all_and_empty()
 
 

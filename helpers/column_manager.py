@@ -166,7 +166,7 @@ class ColumnManager(object):
         """Lazy load the columns as needed."""
         if key not in self._columns:
             self.add_column(self._load_file(key))
-            self._columns[key].open(table, readonly=self.readonly)
+            self._columns[key].open(self.table, readonly=self.readonly)
 
         return self._columns[key]
 
@@ -186,9 +186,6 @@ class ColumnManager(object):
         Returns:
             The new columns name.
         """
-        if self.readonly:
-            raise PermissionError("Cannot modify a readonly.")
-
         if column.name in self._columns:
             # Already added.  Do nothing.  Trust user to not create multiple
             # different columns with the same name.

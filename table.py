@@ -115,7 +115,7 @@ class Table(object):
                 for testing.
 
         Returns:
-            The value at the cell_addr / key.  Or NoneClass instance, if not found.
+            The value at the cell_addr / key.  Or None, if not found.
         """
         if check_date_availability and assert_available_on < self.cm.get_column(
                 cell_addr.col).available_on_date(cell_addr):
@@ -124,12 +124,10 @@ class Table(object):
         result = self.cells.get_value(cell_addr, key)
 
         # Initialize a value then.
-        if result is None:
-            result = self.cm.get_column(cell_addr.col).key_init(cell_addr, key)
-            # To prevent key_init() from running again.
-            if result is None:
-                result = NoneClass()
-            self.cells.set_value(cell_addr, key, result)
+        if isinstance(result, NoneClass):
+            # Has the side-effect of setting the cell.
+            result = self.cm.get_column(cell_addr.col).key_init(
+                cell_addr, key, readonly=self.readonly)
 
         return result
 
