@@ -137,7 +137,7 @@ class ColumnManager(object):
             keyed by the name of those columns.  Keys only exist for columns that
             have been accessed at least once.  Should be accessed through
             get_column.
-        _column_paths: File paths where we've saved the columns as dills.
+        _opened: The set of the columns that have been opened.
         dependency_graph: A dict whose keys are column names, and the values are
             sets containing the names of the columns which depend on the column
             named in the key.
@@ -152,7 +152,7 @@ class ColumnManager(object):
         self.readonly = readonly
 
         self._columns: Dict[ColumnName, Column] = dict()
-        self._column_paths: Dict[ColumnName, Text] = dict()
+        self._opened: Set[ColumnName] = set()
 
         self.dependency_graph: DefaultDict[ColumnName, Set[ColumnName]] = \
             defaultdict(set)
@@ -160,13 +160,13 @@ class ColumnManager(object):
 
     def __contains__(self, col: ColumnName) -> bool:
         """True if col is in self._columns"""
-        return col in self._column_paths or col in self._columns
+        return col in self._columns
 
     def get_column(self, key: ColumnName) -> Column:
-        """Lazy load the columns as needed."""
-        if key not in self._columns:
-            self.add_column(self._load_file(key))
+        """Lazy open the columns as needed."""
+        if key not in self._opened:
             self._columns[key].open(self.table, readonly=self.readonly)
+            self._opened.add(key)
 
         return self._columns[key]
 
@@ -210,11 +210,9 @@ class ColumnManager(object):
         for root, _, files in os.walk(os.path.join("..", COLUMN_FILES_DIR)):
             yield (root, files)
 
-    def _load_file(self, key: Text) -> Column:
+    def _load_file(self, path: Text) -> Column:
         """Load the dict from the passed path.  Return an empty dict if path
         doesn"t exist."""
-        path = self._column_paths[key]
-
         result = dict()
         if os.path.exists(path):
             with open(path, "rb") as f:
@@ -243,8 +241,10 @@ class ColumnManager(object):
             for file in files:
                 if file.find(self.prefix) == -1:
                     continue
-                self._column_paths[file.split("-")[1]] = os.path.join(root,
-                                                                      file)
+                col_path = os.path.join(root, file)
+                new_column = self._load_file(col_path)
+                self._columns[file.split("-")[1]] = new_column
+                self.add_column(new_column)
 
         self._update_column_dependencies()
 
@@ -260,7 +260,8 @@ class ColumnManager(object):
         # Close then save all the columns, overwriting.  Closing will clear
         # non-trivial data structures.
         for k, v in self._columns.items():
-            v.close()
+            if k in self._opened:
+                v.close()
             write_path = os.path.join(
                 COLUMN_FILES_DIR, "{}-{}".format(self.prefix, k))
             self._save_file(v, write_path)
@@ -270,6 +271,6 @@ class ColumnManager(object):
         self.prefix = None
         self.readonly = None
         self._columns= None
-        self._column_paths= None
+        self._opened= None
         self.dependency_graph = None
         self.refresh_order = None
