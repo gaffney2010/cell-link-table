@@ -93,7 +93,7 @@ class Table(object):
     def get_cell_value(self, cell_addr: CellAddr, key: CellKey,
                        assert_available_on: int = MAX_DATE,
                        check_date_availability: bool = CHECK_DATE_AVAILABILITY) -> \
-    Any:
+            Any:
         """Get value corresponding to the key at the cell address.
 
         Mostly a straight-forward pass-through to the get_value function on
@@ -156,15 +156,7 @@ class Table(object):
             raise KeyError("Column not found.")
 
         # Add an entry for the date / key in ds if it doesn't exists.
-        new_key_encountered = self.ds.push_date(cell_addr.date, key)
-
-        # push_date returns true if the key is previously unseen.
-        if new_key_encountered:
-            for col, column in self.cm:
-                # Make initialization actions, if any.
-                column.key_init(cell_addr, key)
-                # And mark as needing updating.
-                self.need_refresh[col].add(CellAddr(cell_addr.date, col))
+        self.ds.push_date(cell_addr.date, key)
 
         # Write to the right place, potentially overwriting.
         self.cells.set_value(cell_addr, key, value)
@@ -188,19 +180,33 @@ class Table(object):
         """
         return self.ds.dates_keys[cell_addr.date]
 
-    def refresh(self) -> None:
+    def refresh(self,
+                target_columns: Optional[List[ColumnName]] = None) -> None:
         """Refresh all the columns that need refreshing.
 
         Loops through the columns in such an order that if column X depends
         on column Y, then Y will get called before X.  Refreshes the columns,
         sending the columns a copy of this table; the columns will refer back
         to the table to see which addresses need refreshing.
+
+        Arguments:
+            target_columns: If this is set only refreshes the columns needed to
+                make these columns be refreshed.
         """
         if self.readonly:
             return
 
+        # Determine all the intermediate columns in need of refreshing.
+        if target_columns is None:
+            will_refresh = {col for col in self.cm._columns.keys()}
+        else:
+            will_refresh = {col for col in target_columns}
+            for col in self.cm.refresh_order[::-1]:
+                if col in will_refresh:
+                    will_refresh.update(self.cm.reverse_dependency_graph[col])
+
         for column_name in self.cm.refresh_order:
-            if self.need_refresh[column_name]:
+            if self.need_refresh[column_name] and column_name in will_refresh:
                 self.cm.get_column(column_name).refresh()
                 self.need_refresh[column_name] = set()
 

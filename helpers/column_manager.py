@@ -141,6 +141,9 @@ class ColumnManager(object):
         dependency_graph: A dict whose keys are column names, and the values are
             sets containing the names of the columns which depend on the column
             named in the key.
+        reverse_dependency_graph: A dict whose keys are column names, and the
+            values are sets containing the names of the columns upon which the
+            column named in the key depend.
         refresh_order: A list of column names specifying the order that the
             columns should be updated so that any column"s dependencies are
             updated after that column.  Intended to be directly accessed
@@ -155,6 +158,9 @@ class ColumnManager(object):
         self._opened: Set[ColumnName] = set()
 
         self.dependency_graph: DefaultDict[ColumnName, Set[ColumnName]] = \
+            defaultdict(set)
+        self.reverse_dependency_graph: DefaultDict[ColumnName,
+                                                   Set[ColumnName]] = \
             defaultdict(set)
         self.refresh_order: List[ColumnName] = list()
 
@@ -203,6 +209,8 @@ class ColumnManager(object):
             # accessed to reset all columns because the dependencies may have
             # changed.
             self.dependency_graph[k] = v.dependencies()
+            for vi in v.dependencies():
+                self.reverse_dependency_graph[vi].add(k)
         self.refresh_order = topological(self.dependency_graph)
 
     def _walk_files(self):
@@ -273,4 +281,5 @@ class ColumnManager(object):
         self._columns= None
         self._opened= None
         self.dependency_graph = None
+        self.reverse_dependency_graph = None
         self.refresh_order = None
