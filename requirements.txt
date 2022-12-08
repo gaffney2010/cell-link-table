@@ -1,5 +1,5 @@
 attrs==19.3.0
-certifi==2019.11.28
+certifi==2022.12.7
 dill==0.3.1.1
 mkl-fft==1.0.15
 mkl-random==1.1.0
